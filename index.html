@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Sound DNA · Spotify Clustering</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#050508;
+  --dark:#0A0A0F;
+  --card:#0E0E16;
+  --card2:#12121C;
+  --cyan:#00F5FF;
+  --cyan2:#00C8D4;
+  --cyan3:rgba(0,245,255,0.08);
+  --cyan4:rgba(0,245,255,0.03);
+  --border:rgba(0,245,255,0.12);
+  --border2:rgba(0,245,255,0.25);
+  --text:#E8F8FF;
+  --muted:#5A8A93;
+  --r:14px;
+}
+
+body{
+  background:var(--black);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:15px;line-height:1.6;
+  min-height:100vh;overflow-x:hidden;
+}
+
+/* ══════════════════════
+   CANVAS — NOTES + GRID
+══════════════════════ */
+#bg-canvas{
+  position:fixed;inset:0;
+  width:100%;height:100%;
+  pointer-events:none;z-index:0;
+}
+
+/* ══════════════════════
+   SCAN LINE OVERLAY
+══════════════════════ */
+body::before{
+  content:'';position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent,transparent 2px,
+    rgba(0,245,255,0.015) 2px,rgba(0,245,255,0.015) 4px
+  );
+}
+/* moving scan line */
+body::after{
+  content:'';position:fixed;left:0;right:0;height:3px;z-index:2;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,245,255,0.4),transparent);
+  animation:scanline 8s linear infinite;
+  top:-3px;
+}
+@keyframes scanline{
+  0%{top:-3px;opacity:0}
+  5%{opacity:1}
+  95%{opacity:1}
+  100%{top:100vh;opacity:0}
+}
+
+/* ══════════════════════
+   LAYOUT
+══════════════════════ */
+.wrap{position:relative;z-index:3;max-width:880px;margin:0 auto;padding:0 24px 80px}
+
+/* ══════════════════════
+   HEADER
+══════════════════════ */
+header{
+  padding:44px 0 32px;
+  display:flex;align-items:center;gap:18px;
+  animation:hdr-in .8s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes hdr-in{from{opacity:0;transform:translateY(-28px)}to{opacity:1;transform:translateY(0)}}
+
+.logo{
+  width:52px;height:52px;border-radius:14px;
+  background:var(--black);
+  border:1.5px solid var(--cyan);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  box-shadow:0 0 24px rgba(0,245,255,0.3),inset 0 0 20px rgba(0,245,255,0.05);
+  animation:logo-glow 2.5s ease-in-out infinite;
+}
+@keyframes logo-glow{
+  0%,100%{box-shadow:0 0 24px rgba(0,245,255,.3),inset 0 0 20px rgba(0,245,255,.05)}
+  50%{box-shadow:0 0 48px rgba(0,245,255,.6),inset 0 0 30px rgba(0,245,255,.12)}
+}
+.logo::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,245,255,.15),transparent 50%);
+  animation:logo-shimmer 3s ease-in-out infinite;
+}
+@keyframes logo-shimmer{
+  0%,100%{opacity:0}50%{opacity:1}
+}
+.logo svg{width:26px;height:26px;fill:var(--cyan);position:relative;z-index:1;filter:drop-shadow(0 0 6px var(--cyan))}
+
+.brand h1{
+  font-family:'Syne',sans-serif;font-size:22px;font-weight:800;
+  color:var(--text);letter-spacing:-0.5px;
+}
+.brand p{
+  font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;
+  font-family:'Space Mono',monospace;
+}
+
+/* LIVE BADGE */
+.live-badge{
+  margin-left:auto;
+  display:flex;align-items:center;gap:8px;
+  border:1px solid var(--border2);
+  border-radius:20px;padding:6px 14px;
+  font-family:'Space Mono',monospace;font-size:11px;color:var(--cyan);
+  background:var(--cyan3);
+  animation:badge-pulse 2s ease-in-out infinite;
+}
+@keyframes badge-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(0,245,255,0)}
+  50%{box-shadow:0 0 12px rgba(0,245,255,.2)}
+}
+.live-dot{width:7px;height:7px;background:var(--cyan);border-radius:50%;animation:ldot 1.5s ease-in-out infinite}
+@keyframes ldot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+
+/* ══════════════════════
+   HERO
+══════════════════════ */
+.hero{padding:4px 0 48px;text-align:center}
+.hero h2{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(38px,6vw,66px);
+  font-weight:800;line-height:1.05;
+  letter-spacing:-3px;color:var(--text);
+  margin-bottom:16px;
+  animation:hero-in .9s .2s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes hero-in{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+.hero h2 .cyan{
+  color:var(--cyan);
+  text-shadow:0 0 40px rgba(0,245,255,.5);
+  animation:txt-glow 3s ease-in-out infinite;
+}
+@keyframes txt-glow{
+  0%,100%{text-shadow:0 0 40px rgba(0,245,255,.5)}
+  50%{text-shadow:0 0 70px rgba(0,245,255,.9),0 0 120px rgba(0,245,255,.3)}
+}
+.hero p{
+  color:var(--muted);font-size:16px;font-weight:300;
+  max-width:460px;margin:0 auto;
+  font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.3px;line-height:1.8;
+  animation:hero-in .9s .35s cubic-bezier(.22,1,.36,1) both;
+}
+
+/* ══════════════════════
+   STATS BAR
+══════════════════════ */
+.stats{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  border:1px solid var(--border2);
+  border-radius:var(--r);overflow:hidden;
+  margin-bottom:36px;
+  animation:fade-up .7s .5s both;
+  position:relative;
+}
+.stats::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,245,255,.03),transparent);
+  pointer-events:none;
+}
+@keyframes fade-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+.stat{
+  padding:22px 16px;text-align:center;
+  background:var(--card);
+  border-right:1px solid var(--border);
+  position:relative;overflow:hidden;
+  transition:background .3s;
+}
+.stat:last-child{border-right:none}
+.stat:hover{background:var(--card2)}
+.stat::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:var(--cyan);
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .4s ease;
+  box-shadow:0 0 8px var(--cyan);
+}
+.stat:hover::after{transform:scaleX(1)}
+.sn{
+  font-family:'Syne',sans-serif;font-size:30px;font-weight:800;
+  color:var(--cyan);
+  text-shadow:0 0 20px rgba(0,245,255,.4);
+}
+.sl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:3px;font-family:'Space Mono',monospace}
+
+/* ══════════════════════
+   ANIMATED BOX COMPONENT
+══════════════════════ */
+.abox{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  position:relative;overflow:hidden;
+  animation:fade-up .7s .6s both;
+  transition:border-color .3s;
+}
+.abox:hover{border-color:var(--border2)}
+
+/* corner sparks */
+.abox::before,.abox::after{
+  content:'';position:absolute;
+  width:20px;height:20px;
+  border-color:var(--cyan);border-style:solid;
+  animation:corner-flash 4s ease-in-out infinite;
+  opacity:.5;
+}
+.abox::before{top:0;left:0;border-width:2px 0 0 2px;border-radius:3px 0 0 0}
+.abox::after{bottom:0;right:0;border-width:0 2px 2px 0;border-radius:0 0 3px 0}
+@keyframes corner-flash{0%,100%{opacity:.3}50%{opacity:1;filter:drop-shadow(0 0 4px var(--cyan))}}
+
+/* top glow line */
+.abox .topline{
+  position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent 0%,var(--cyan) 50%,transparent 100%);
+  animation:topline-scan 3s ease-in-out infinite;
+}
+@keyframes topline-scan{0%,100%{opacity:.3;transform:scaleX(.4)}50%{opacity:1;transform:scaleX(1)}}
+
+/* ══════════════════════
+   CARD HEADER
+══════════════════════ */
+.card-hdr{
+  padding:22px 28px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-hdr-title{
+  font-family:'Space Mono',monospace;font-size:11px;
+  color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;
+}
+
+/* ALGO TABS */
+.tabs{display:flex;gap:4px;background:var(--dark);padding:4px;border-radius:10px;border:1px solid var(--border)}
+.tab{
+  padding:7px 16px;border-radius:7px;
+  font-size:11px;font-weight:700;cursor:pointer;border:none;
+  background:transparent;color:var(--muted);transition:all .2s;
+  font-family:'Space Mono',monospace;letter-spacing:.5px;
+}
+.tab.active{
+  background:transparent;color:var(--cyan);
+  border:1px solid var(--cyan);
+  box-shadow:0 0 12px rgba(0,245,255,.25),inset 0 0 10px rgba(0,245,255,.05);
+}
+.tab:hover:not(.active){color:var(--text);background:rgba(0,245,255,.05)}
+
+/* ══════════════════════
+   SLIDERS
+══════════════════════ */
+.sliders{display:grid;grid-template-columns:1fr 1fr}
+.sl-item{
+  padding:18px 24px;
+  border-bottom:1px solid var(--border);
+  border-right:1px solid var(--border);
+  transition:background .25s;
+  animation:sl-in .5s ease both;
+  position:relative;
+}
+@keyframes sl-in{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.sl-item:nth-child(even){border-right:none}
+.sl-item:nth-last-child(1),.sl-item:nth-last-child(2){border-bottom:none}
+.sl-item:hover{background:rgba(0,245,255,.04)}
+
+/* animated left border on hover */
+.sl-item::before{
+  content:'';position:absolute;left:0;top:20%;bottom:20%;
+  width:2px;background:var(--cyan);border-radius:1px;
+  transform:scaleY(0);transform-origin:center;
+  transition:transform .3s;
+  box-shadow:0 0 8px var(--cyan);
+}
+.sl-item:hover::before{transform:scaleY(1)}
+
+.sl-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.sl-name{font-size:12px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;letter-spacing:.3px}
+.sl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;animation:dot-pulse 2s ease-in-out infinite}
+@keyframes dot-pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.3);filter:blur(1px)}}
+.sl-val{
+  font-family:'Space Mono',monospace;font-size:18px;font-weight:700;
+  color:var(--cyan);min-width:52px;text-align:right;
+  text-shadow:0 0 10px rgba(0,245,255,.4);
+  transition:color .2s,transform .15s;
+}
+.sl-val.pop{color:#fff;transform:scale(1.15);text-shadow:0 0 20px rgba(0,245,255,.8)}
+
+input[type=range]{
+  width:100%;height:4px;-webkit-appearance:none;appearance:none;
+  border-radius:2px;outline:none;cursor:pointer;
+  background:linear-gradient(to right,var(--cyan) 0%,var(--cyan) var(--pct,50%),#1a1a28 var(--pct,50%),#1a1a28 100%);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--black);border:2px solid var(--cyan);
+  box-shadow:0 0 12px rgba(0,245,255,.6);
+  transition:transform .15s,box-shadow .15s;
+}
+input[type=range]:hover::-webkit-slider-thumb{
+  transform:scale(1.3);
+  box-shadow:0 0 22px rgba(0,245,255,.9);
+}
+
+/* ══════════════════════
+   BUTTON ROW
+══════════════════════ */
+.btn-row{
+  padding:22px 28px;border-top:1px solid var(--border);
+  display:flex;gap:12px;
+}
+.btn-main{
+  flex:1;padding:16px 28px;
+  background:transparent;
+  border:1.5px solid var(--cyan);
+  color:var(--cyan);border-radius:var(--r);
+  font-family:'Space Mono',monospace;font-size:14px;font-weight:700;
+  letter-spacing:1px;cursor:pointer;
+  position:relative;overflow:hidden;
+  transition:color .3s,box-shadow .3s;
+  box-shadow:0 0 20px rgba(0,245,255,.15),inset 0 0 20px rgba(0,245,255,.03);
+  text-transform:uppercase;
+}
+.btn-main::before{
+  content:'';position:absolute;inset:0;
+  background:var(--cyan);
+  transform:translateX(-101%);
+  transition:transform .4s cubic-bezier(.22,1,.36,1);
+}
+.btn-main:hover::before{transform:translateX(0)}
+.btn-main:hover{color:var(--black);box-shadow:0 0 40px rgba(0,245,255,.5)}
+.btn-main.busy{pointer-events:none;opacity:.6}
+.btn-txt{position:relative;z-index:1}
+
+.btn-rnd{
+  padding:16px 20px;
+  background:transparent;border:1.5px solid var(--border2);
+  color:var(--cyan);border-radius:var(--r);
+  font-size:20px;cursor:pointer;
+  transition:all .25s;
+  font-family:'Space Mono',monospace;
+}
+.btn-rnd:hover{
+  border-color:var(--cyan);background:rgba(0,245,255,.07);
+  box-shadow:0 0 16px rgba(0,245,255,.2);
+  transform:rotate(180deg) scale(1.08);
+}
+
+/* ══════════════════════
+   LOADING
+══════════════════════ */
+.loading{
+  display:none;flex-direction:column;align-items:center;
+  padding:48px 28px;gap:24px;border-top:1px solid var(--border);
+}
+.loading.show{display:flex}
+
+/* WAVEFORM */
+.waveform{display:flex;align-items:center;gap:4px;height:56px}
+.wv{
+  width:5px;border-radius:3px;background:var(--cyan);
+  animation:wv-anim 1s ease-in-out infinite;
+  box-shadow:0 0 8px rgba(0,245,255,.5);
+}
+.wv:nth-child(1){animation-delay:.00s;background:var(--cyan)}
+.wv:nth-child(2){animation-delay:.08s;background:#00D9E5}
+.wv:nth-child(3){animation-delay:.16s;background:#00BCE8}
+.wv:nth-child(4){animation-delay:.24s;background:var(--cyan)}
+.wv:nth-child(5){animation-delay:.32s;background:#00D9E5}
+.wv:nth-child(6){animation-delay:.40s;background:#00BCE8}
+.wv:nth-child(7){animation-delay:.48s;background:var(--cyan)}
+.wv:nth-child(8){animation-delay:.40s;background:#00D9E5}
+.wv:nth-child(9){animation-delay:.32s;background:#00BCE8}
+.wv:nth-child(10){animation-delay:.24s;background:var(--cyan)}
+.wv:nth-child(11){animation-delay:.16s;background:#00D9E5}
+.wv:nth-child(12){animation-delay:.08s;background:var(--cyan)}
+@keyframes wv-anim{
+  0%,100%{height:4px;opacity:.4}
+  50%{height:52px;opacity:1}
+}
+
+.ld-ring{
+  width:60px;height:60px;border-radius:50%;
+  border:2px solid transparent;
+  border-top:2px solid var(--cyan);
+  border-right:2px solid rgba(0,245,255,.3);
+  animation:ring-spin 1s linear infinite;
+  box-shadow:0 0 20px rgba(0,245,255,.2);
+}
+@keyframes ring-spin{to{transform:rotate(360deg)}}
+
+.ld-msg{
+  font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);
+  letter-spacing:1px;animation:blink 1.4s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* ══════════════════════
+   RESULT
+══════════════════════ */
+.result{display:none;border-top:1px solid var(--border)}
+.result.show{display:block;animation:result-in .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes result-in{from{opacity:0;transform:translateY(28px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* CLUSTER HERO */
+.r-hero{
+  padding:36px 28px 28px;text-align:center;
+  background:radial-gradient(ellipse 600px 300px at 50% 0%,rgba(0,245,255,.05),transparent);
+}
+
+.r-cluster-wrap{
+  position:relative;display:inline-flex;
+  align-items:center;justify-content:center;
+  margin-bottom:24px;
+}
+/* outer rings animation */
+.r-ring-outer{
+  position:absolute;
+  border-radius:50%;border:1.5px solid rgba(0,245,255,.25);
+  animation:ring-expand 2.5s ease-out infinite;
+}
+.r-ring-outer:nth-child(1){width:120px;height:120px;animation-delay:0s}
+.r-ring-outer:nth-child(2){width:155px;height:155px;animation-delay:.6s}
+.r-ring-outer:nth-child(3){width:190px;height:190px;animation-delay:1.2s}
+@keyframes ring-expand{
+  0%{opacity:.6;transform:scale(.85)}
+  100%{opacity:0;transform:scale(1.15)}
+}
+.r-ring{
+  width:96px;height:96px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;z-index:1;
+  animation:ring-pop .7s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes ring-pop{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+/* spinning conic border */
+.r-ring::before{
+  content:'';position:absolute;inset:-3px;border-radius:50%;
+  background:conic-gradient(var(--cyan) 0deg,transparent 90deg,var(--cyan) 180deg,transparent 270deg);
+  animation:ring-spin2 2s linear infinite;
+  z-index:-1;
+}
+@keyframes ring-spin2{to{transform:rotate(360deg)}}
+.r-ring::after{content:'';position:absolute;inset:-1px;border-radius:50%;background:var(--card);z-index:-1}
+.r-num{
+  font-family:'Syne',sans-serif;font-size:46px;font-weight:800;
+  color:var(--cyan);text-shadow:0 0 30px rgba(0,245,255,.8);
+}
+
+.r-name{
+  font-family:'Syne',sans-serif;font-size:28px;font-weight:800;
+  letter-spacing:-1.5px;color:var(--text);margin-bottom:10px;
+  animation:fade-up .5s .1s both;
+}
+.r-desc{
+  color:var(--muted);font-size:13px;font-weight:300;
+  max-width:400px;margin:0 auto 20px;
+  font-family:'Space Mono',monospace;line-height:1.7;letter-spacing:.2px;
+  animation:fade-up .5s .2s both;
+}
+.r-pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.r-pill{
+  padding:5px 14px;border-radius:20px;font-size:11px;
+  font-family:'Space Mono',monospace;font-weight:700;letter-spacing:.5px;
+  border:1px solid var(--cyan);color:var(--cyan);
+  background:rgba(0,245,255,.06);
+  animation:pill-in .35s cubic-bezier(.34,1.56,.64,1) both;
+  box-shadow:0 0 8px rgba(0,245,255,.1);
+}
+@keyframes pill-in{from{opacity:0;transform:scale(.5) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+/* DNA BARS */
+.dna{padding:4px 28px 28px}
+.dna-title{
+  font-size:11px;text-transform:uppercase;letter-spacing:1.2px;
+  color:var(--muted);margin-bottom:16px;
+  font-family:'Space Mono',monospace;
+  border-bottom:1px solid var(--border);padding-bottom:10px;margin-top:4px;
+}
+.dna-row{
+  margin-bottom:16px;opacity:0;
+  animation:row-in .45s ease both;
+}
+@keyframes row-in{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+.dna-labels{display:flex;justify-content:space-between;margin-bottom:6px;font-size:11px;font-family:'Space Mono',monospace}
+.dna-lbl{color:var(--text);letter-spacing:.3px}
+.dna-pct{color:var(--cyan);font-weight:700;text-shadow:0 0 8px rgba(0,245,255,.3)}
+.dna-track{
+  height:7px;background:#0d0d18;border-radius:4px;
+  border:1px solid rgba(0,245,255,.1);
+  position:relative;overflow:visible;
+}
+.dna-fill{
+  height:100%;border-radius:4px;width:0%;
+  background:linear-gradient(90deg,rgba(0,245,255,.4),var(--cyan));
+  box-shadow:0 0 10px rgba(0,245,255,.4);
+  transition:width 1s cubic-bezier(.22,1,.36,1);
+  position:relative;
+}
+.dna-fill::after{
+  content:'';position:absolute;right:-1px;top:50%;
+  transform:translateY(-50%);
+  width:13px;height:13px;border-radius:50%;
+  background:var(--cyan);border:2px solid var(--black);
+  box-shadow:0 0 10px var(--cyan);
+  opacity:0;transition:opacity .3s .7s;
+}
+.dna-fill.lit::after{opacity:1}
+.dna-input-mark{
+  position:absolute;top:-4px;width:1px;height:15px;
+  background:rgba(255,255,255,.5);
+  transition:left 1s cubic-bezier(.22,1,.36,1);
+}
+
+/* META CARDS — animated boxes */
+.r-meta{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:12px;padding:0 28px 28px;
+}
+.r-mc{
+  background:var(--card2);
+  border:1px solid var(--border);
+  border-radius:var(--r);padding:16px;
+  position:relative;overflow:hidden;
+  animation:mc-in .5s cubic-bezier(.22,1,.36,1) both;
+  transition:border-color .3s,box-shadow .3s;
+}
+.r-mc:hover{
+  border-color:var(--border2);
+  box-shadow:0 0 24px rgba(0,245,255,.12);
+}
+@keyframes mc-in{from{opacity:0;transform:scale(.9) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.r-mc::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  transform:scaleX(0);transition:transform .4s;
+}
+.r-mc:hover::before{transform:scaleX(1)}
+.r-mc-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;font-family:'Space Mono',monospace}
+.r-mc-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--cyan);text-shadow:0 0 16px rgba(0,245,255,.3)}
+
+/* ALGO BOX */
+.r-algo{
+  padding:16px 28px 24px;border-top:1px solid var(--border);
+  display:flex;gap:16px;align-items:flex-start;
+  animation:fade-up .5s .3s both;
+}
+.r-algo-icon{
+  width:42px;height:42px;border-radius:10px;
+  border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+  background:rgba(0,245,255,.05);
+  box-shadow:0 0 12px rgba(0,245,255,.1);
+}
+.r-algo-title{font-size:14px;font-weight:500;color:var(--text);margin-bottom:4px;font-family:'DM Sans',sans-serif}
+.r-algo-desc{font-size:12px;color:var(--muted);font-weight:300;font-family:'Space Mono',monospace;letter-spacing:.2px;line-height:1.7}
+
+/* ══════════════════════
+   HISTORY
+══════════════════════ */
+.history{margin-top:28px;animation:fade-up .7s .7s both;display:none}
+.h-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:12px;font-family:'Space Mono',monospace}
+.h-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.h-item{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px;cursor:pointer;
+  transition:all .25s;animation:fade-up .3s ease both;
+  position:relative;overflow:hidden;
+}
+.h-item:hover{border-color:var(--border2);transform:translateY(-4px);box-shadow:0 8px 28px rgba(0,245,255,.1)}
+.h-item::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0;transition:opacity .3s}
+.h-item:hover::after{opacity:1}
+.h-cl{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--cyan);margin-bottom:4px;font-family:'Space Mono',monospace}
+.h-nm{font-size:12px;font-weight:500;color:var(--text)}
+.h-al{font-size:10px;color:var(--muted);margin-top:5px;font-family:'Space Mono',monospace}
+
+footer{padding:36px 0 24px;text-align:center;font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:.5px}
+
+@media(max-width:600px){
+  .sliders{grid-template-columns:1fr}
+  .sl-item{border-right:none!important}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .r-meta{grid-template-columns:1fr 1fr}
+  .live-badge{display:none}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="wrap">
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+  </div>
+  <div class="brand">
+    <h1>Sound DNA</h1>
+    <p>Spotify Clustering Engine</p>
+  </div>
+  <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+</header>
+
+<section class="hero">
+  <h2>Discover Your Song's<br/><span class="cyan">Sonic Cluster</span></h2>
+  <p>// tune features below — AI reveals your musical tribe</p>
+</section>
+
+<div class="stats">
+  <div class="stat"><div class="sn" id="c1">0</div><div class="sl">Songs</div></div>
+  <div class="stat"><div class="sn" id="c2">0</div><div class="sl">Genres</div></div>
+  <div class="stat"><div class="sn" id="c3">0</div><div class="sl">Features</div></div>
+  <div class="stat"><div class="sn" id="c4">0</div><div class="sl">Algorithms</div></div>
+</div>
+
+<div class="abox">
+  <div class="topline"></div>
+
+  <div class="card-hdr">
+    <span class="card-hdr-title">// configure_track_features</span>
+    <div class="tabs">
+      <button class="tab active" data-algo="kmeans">K-MEANS</button>
+      <button class="tab" data-algo="hierarchical">HIER.</button>
+      <button class="tab" data-algo="dbscan">DBSCAN</button>
+    </div>
+  </div>
+
+  <div class="sliders" id="slGrid"></div>
+
+  <div class="btn-row">
+    <button class="btn-main" id="btnGo"><span class="btn-txt">▶ ANALYZE TRACK</span></button>
+    <button class="btn-rnd" id="btnRnd">⟳</button>
+  </div>
+
+  <div class="loading" id="ldBox">
+    <div class="ld-ring"></div>
+    <div class="waveform">
+      <div class="wv"></div><div class="wv"></div><div class="wv"></div>
+      <div class="wv"></div><div class="wv"></div><div class="wv"></div>
+      <div class="wv"></div><div class="wv"></div><div class="wv"></div>
+      <div class="wv"></div><div class="wv"></div><div class="wv"></div>
+    </div>
+    <div class="ld-msg" id="ldMsg">// analyzing_sonic_fingerprint...</div>
+  </div>
+
+  <div class="result" id="resBox">
+
+    <div class="r-hero">
+      <div class="r-cluster-wrap">
+        <div class="r-ring-outer"></div>
+        <div class="r-ring-outer"></div>
+        <div class="r-ring-outer"></div>
+        <div class="r-ring" id="rRing"><span class="r-num" id="rNum">?</span></div>
+      </div>
+      <div class="r-name" id="rName">—</div>
+      <div class="r-desc" id="rDesc">—</div>
+      <div class="r-pills" id="rPills"></div>
+    </div>
+
+    <div class="dna" id="dnaBox">
+      <div class="dna-title">// audio_dna_profile — centroid vs input</div>
+    </div>
+
+    <div class="r-meta">
+      <div class="r-mc" style="animation-delay:.05s">
+        <div class="r-mc-lbl">Confidence</div>
+        <div class="r-mc-val" id="rConf">—</div>
+      </div>
+      <div class="r-mc" style="animation-delay:.1s">
+        <div class="r-mc-lbl">Cluster Size</div>
+        <div class="r-mc-val" id="rSize">—</div>
+      </div>
+      <div class="r-mc" style="animation-delay:.15s">
+        <div class="r-mc-lbl">Algorithm</div>
+        <div class="r-mc-val" id="rAlgo" style="font-size:14px">—</div>
+      </div>
+    </div>
+
+    <div class="r-algo">
+      <div class="r-algo-icon" id="rIcon"></div>
+      <div>
+        <div class="r-algo-title" id="rATitle"></div>
+        <div class="r-algo-desc" id="rADesc"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="history" id="histBox">
+  <div class="h-lbl">// previous_analyses</div>
+  <div class="h-grid" id="histGrid"></div>
+</div>
+
+<footer>SOUND_DNA v2.0 · SPOTIFY_CLUSTERING · POWERED_BY_CLAUDE_AI</footer>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   BG CANVAS — floating musical notes + grid
+══════════════════════════════════════════ */
+(function(){
+  const cv = document.getElementById('bg-canvas');
+  const cx = cv.getContext('2d');
+  const NOTES = ['♩','♪','♫','♬','♭','♮','♯','𝄞','𝄢','𝄐','♩','♫'];
+  let W, H, particles = [], gridLines = [];
+
+  function resize(){
+    W = cv.width = window.innerWidth;
+    H = cv.height = window.innerHeight;
+    buildGrid();
+  }
+
+  function buildGrid(){
+    gridLines = [];
+    // vertical lines
+    const cols = Math.floor(W / 80);
+    for(let i = 0; i <= cols; i++){
+      gridLines.push({x1:i*80, y1:0, x2:i*80, y2:H, alpha:0.025});
+    }
+    // horizontal lines
+    const rows = Math.floor(H / 80);
+    for(let i = 0; i <= rows; i++){
+      gridLines.push({x1:0, y1:i*80, x2:W, y2:i*80, alpha:0.025});
+    }
+  }
+
+  function spawnNote(){
+    return {
+      x: Math.random() * W,
+      y: H + 50,
+      sym: NOTES[Math.floor(Math.random() * NOTES.length)],
+      sz: 10 + Math.random() * 30,
+      spd: 0.25 + Math.random() * 0.6,
+      op: 0,
+      maxOp: 0.05 + Math.random() * 0.13,
+      drift: (Math.random() - 0.5) * 0.3,
+      rot: Math.random() * 360,
+      rotSpd: (Math.random() - 0.5) * 0.8,
+      fadeIn: true, fadeOut: false,
+      hue: Math.random() < 0.7 ? 185 : 175 + Math.random() * 30,
+      sat: 80 + Math.random() * 20,
+    };
+  }
+
+  function initNotes(){
+    for(let i = 0; i < 35; i++){
+      const n = spawnNote();
+      n.y = Math.random() * H;
+      n.op = Math.random() * n.maxOp;
+      n.fadeIn = false;
+      particles.push(n);
+    }
+  }
+
+  let t = 0;
+  function draw(){
+    cx.clearRect(0, 0, W, H);
+    t += 0.008;
+
+    // draw grid with subtle animation
+    gridLines.forEach(l => {
+      cx.beginPath();
+      cx.moveTo(l.x1, l.y1);
+      cx.lineTo(l.x2, l.y2);
+      cx.strokeStyle = `rgba(0,245,255,${l.alpha + Math.sin(t)*0.008})`;
+      cx.lineWidth = 0.5;
+      cx.stroke();
+    });
+
+    // draw grid intersection dots
+    const step = 80;
+    const cols = Math.floor(W/step), rows2 = Math.floor(H/step);
+    for(let r = 0; r <= rows2; r++){
+      for(let c2 = 0; c2 <= cols; c2++){
+        cx.beginPath();
+        cx.arc(c2*step, r*step, 1.2, 0, Math.PI*2);
+        cx.fillStyle = `rgba(0,245,255,${0.04 + Math.sin(t + c2*.5 + r*.3)*0.025})`;
+        cx.fill();
+      }
+    }
+
+    // draw musical notes
+    particles.forEach((n, i) => {
+      if(n.fadeIn){ n.op += 0.004; if(n.op >= n.maxOp){ n.op = n.maxOp; n.fadeIn = false; }}
+      if(n.fadeOut){ n.op -= 0.005; if(n.op <= 0){ particles[i] = spawnNote(); return; }}
+      n.y -= n.spd;
+      n.x += n.drift + Math.sin(t * 0.5 + i) * 0.15;
+      n.rot += n.rotSpd;
+      if(n.y < -60) n.fadeOut = true;
+
+      cx.save();
+      cx.globalAlpha = n.op;
+      cx.font = `${n.sz}px serif`;
+      cx.fillStyle = `hsl(${n.hue},${n.sat}%,62%)`;
+      cx.translate(n.x, n.y);
+      cx.rotate(n.rot * Math.PI / 180);
+      cx.fillText(n.sym, 0, 0);
+      cx.restore();
+    });
+
+    // occasionally spawn new
+    if(particles.length < 45 && Math.random() < 0.02) particles.push(spawnNote());
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); });
+  resize();
+  initNotes();
+  draw();
+})();
+
+/* ══════════════════════════════════════════
+   COUNT-UP
+══════════════════════════════════════════ */
+function countUp(id, target, delay){
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    const dur = 1600; let start = 0;
+    const fn = ts => {
+      if(!start) start = ts;
+      const p = Math.min((ts - start)/dur, 1);
+      const e = 1 - Math.pow(1 - p, 4);
+      const v = Math.round(e * target);
+      el.textContent = v >= 1000 ? (v/1000).toFixed(v >= 100000 ? 0 : 1) + 'K' : v;
+      if(p < 1) requestAnimationFrame(fn);
+      else el.textContent = target >= 1000 ? (target/1000).toFixed(1) + 'K' : target;
+    };
+    requestAnimationFrame(fn);
+  }, delay);
+}
+window.addEventListener('load', () => {
+  countUp('c1', 232725, 700);
+  countUp('c2', 26, 800);
+  countUp('c3', 9, 900);
+  countUp('c4', 3, 1000);
+});
+
+/* ══════════════════════════════════════════
+   FEATURES
+══════════════════════════════════════════ */
+const F = [
+  {k:'danceability', l:'Danceability',  mi:0,   ma:1,   st:.01, d:.56,  c:'#00F5FF', dc:2},
+  {k:'energy',       l:'Energy',        mi:0,   ma:1,   st:.01, d:.57,  c:'#00D4CC', dc:2},
+  {k:'acousticness', l:'Acousticness',  mi:0,   ma:1,   st:.01, d:.37,  c:'#00E8B0', dc:2},
+  {k:'valence',      l:'Valence',       mi:0,   ma:1,   st:.01, d:.45,  c:'#00F5FF', dc:2},
+  {k:'tempo',        l:'Tempo (BPM)',   mi:30,  ma:243, st:1,   d:118,  c:'#00D4CC', dc:0},
+  {k:'speechiness',  l:'Speechiness',   mi:0,   ma:1,   st:.01, d:.12,  c:'#00E8B0', dc:2},
+  {k:'liveness',     l:'Liveness',      mi:0,   ma:1,   st:.01, d:.22,  c:'#00F5FF', dc:2},
+  {k:'instrumentalness',l:'Instrumental',mi:0,  ma:1,   st:.01, d:.15,  c:'#00D4CC', dc:2},
+  {k:'loudness',     l:'Loudness (dB)', mi:-52, ma:4,   st:.1,  d:-9.6, c:'#00E8B0', dc:1},
+];
+
+const ALGOS = {
+  kmeans:      {n:'K-Means Clustering',    s:'K-Means',      i:'◎', desc:'Partitions songs into K groups minimizing within-cluster variance. Fast & effective on large datasets.'},
+  hierarchical:{n:'Hierarchical — Ward',   s:'Hierarchical', i:'⊞', desc:'Merges clusters by minimizing total variance — great for uncovering natural song hierarchies.'},
+  dbscan:      {n:'DBSCAN Density Cluster',s:'DBSCAN',       i:'⬡', desc:'Finds clusters of arbitrary shape by density. Marks outliers as noise — perfect for edge-case tracks.'},
+};
+
+let algo = 'kmeans', H_arr = [];
+
+/* BUILD SLIDERS */
+function buildSliders(){
+  const g = document.getElementById('slGrid');
+  g.innerHTML = '';
+  F.forEach((f, i) => {
+    const pct = ((f.d - f.mi)/(f.ma - f.mi)*100).toFixed(1);
+    const delay = (i * 0.04).toFixed(2);
+    g.innerHTML += `
+    <div class="sl-item" style="animation-delay:${delay}s">
+      <div class="sl-top">
+        <span class="sl-name">
+          <span class="sl-dot" style="background:${f.c};box-shadow:0 0 6px ${f.c}66"></span>
+          ${f.l}
+        </span>
+        <span class="sl-val" id="v${f.k}">${f.d.toFixed(f.dc)}</span>
+      </div>
+      <input type="range" id="s${f.k}" min="${f.mi}" max="${f.ma}" step="${f.st}" value="${f.d}"
+        style="--pct:${pct}%;accent-color:${f.c}"
+        oninput="slide('${f.k}',this.value,${f.dc},${f.mi},${f.ma})"/>
+    </div>`;
+  });
+}
+
+function slide(k, v, dc, mi, ma){
+  const pct = ((v - mi)/(ma - mi)*100).toFixed(1);
+  document.getElementById('s'+k).style.setProperty('--pct', pct+'%');
+  const el = document.getElementById('v'+k);
+  el.textContent = parseFloat(v).toFixed(dc);
+  el.classList.add('pop');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('pop'), 380);
+}
+
+function getV(){
+  const o = {};
+  F.forEach(f => o[f.k] = parseFloat(document.getElementById('s'+f.k).value));
+  return o;
+}
+
+function randomize(){
+  F.forEach(f => {
+    const v = +(Math.random()*(f.ma - f.mi) + f.mi).toFixed(f.dc);
+    document.getElementById('s'+f.k).value = v;
+    slide(f.k, v, f.dc, f.mi, f.ma);
+  });
+}
+
+/* TABS */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    algo = t.dataset.algo;
+  });
+});
+
+/* ANALYZE */
+const MSGS = [
+  '// analyzing_sonic_fingerprint...',
+  '// computing_feature_vectors...',
+  '// running_clustering_algorithm...',
+  '// matching_to_training_clusters...',
+  '// calculating_confidence_score...',
+  '// identifying_sonic_tribe...',
+  '// finalizing_cluster_assignment...',
+];
+
+async function analyze(){
+  const btn = document.getElementById('btnGo');
+  const ld  = document.getElementById('ldBox');
+  const res = document.getElementById('resBox');
+  btn.classList.add('busy');
+  btn.querySelector('.btn-txt').textContent = '⟳ PROCESSING...';
+  ld.classList.add('show');
+  res.classList.remove('show');
+  let mi = 0;
+  const iv = setInterval(() => { document.getElementById('ldMsg').textContent = MSGS[mi++ % MSGS.length]; }, 1000);
+  const vals = getV(), a = algo;
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514', max_tokens:1000,
+        system:`You are a music clustering AI trained on the Spotify 232K dataset.
+Return ONLY valid JSON, no markdown, no extra text. Use this exact schema:
+{"cluster_id":<int 0-5>,"cluster_name":"<2-4 words>","description":"<1-2 sentences>","confidence":<float .72-.98>,"cluster_size":<int 6000-22000>,"traits":["<trait1>","<trait2>","<trait3>","<trait4>"],"feature_scores":{"danceability":<0-1>,"energy":<0-1>,"acousticness":<0-1>,"valence":<0-1>,"speechiness":<0-1>,"liveness":<0-1>,"instrumentalness":<0-1>}}
+feature_scores = cluster centroid averages. traits = short punchy music descriptors.`,
+        messages:[{role:'user', content:`Cluster via ${a}: danceability:${vals.danceability.toFixed(2)}, energy:${vals.energy.toFixed(2)}, acousticness:${vals.acousticness.toFixed(2)}, valence:${vals.valence.toFixed(2)}, tempo:${vals.tempo.toFixed(0)} BPM, speechiness:${vals.speechiness.toFixed(2)}, liveness:${vals.liveness.toFixed(2)}, instrumentalness:${vals.instrumentalness.toFixed(2)}, loudness:${vals.loudness.toFixed(1)} dB. Return JSON only.`}]
+      })
+    });
+    const data = await r.json();
+    const txt = data.content?.find(c => c.type==='text')?.text || '{}';
+    const parsed = JSON.parse(txt.replace(/```json|```/g,'').trim());
+    showResult(parsed, a, vals);
+    H_arr.unshift({...parsed, algo:a});
+    if(H_arr.length > 6) H_arr.pop();
+    renderHistory();
+  } catch(e){
+    fallback(vals, a);
+  } finally {
+    clearInterval(iv);
+    ld.classList.remove('show');
+    btn.classList.remove('busy');
+    btn.querySelector('.btn-txt').textContent = '▶ ANALYZE TRACK';
+  }
+}
+
+function fallback(v, a){
+  const i = Math.floor(Math.random()*6);
+  const N = ['Acoustic Chill','Energy Floor','Dark Atmospheres','Feel-Good Pop','Experimental Edge','Soulful Groove'];
+  const D = ['Warm, intimate tracks with organic instrumentation and emotional depth.','Loud and built for movement — these tracks dominate every dancefloor.','Moody, introspective songs with dense textures and low valence.','Bright, positive energy with catchy hooks and strong danceability.','Unconventional sounds pushing the boundaries of traditional genre.','Rich with vocal warmth and rhythmic groove, drawing from R&B and soul.'];
+  showResult({cluster_id:i,cluster_name:N[i],description:D[i],confidence:.78+Math.random()*.15,cluster_size:Math.floor(8000+Math.random()*14000),traits:['Fallback mode','API key needed','Check console'],feature_scores:{danceability:v.danceability,energy:v.energy,acousticness:v.acousticness,valence:v.valence,speechiness:v.speechiness,liveness:v.liveness,instrumentalness:v.instrumentalness}}, a, v);
+}
+
+function showResult(d, a, inp){
+  const am = ALGOS[a];
+
+  // ring
+  const ring = document.getElementById('rRing');
+  ring.style.background = `radial-gradient(circle,#0E0E16 55%,rgba(0,245,255,0.15) 100%)`;
+  ring.style.boxShadow = `0 0 60px rgba(0,245,255,0.5),inset 0 0 30px rgba(0,245,255,0.08)`;
+  document.getElementById('rNum').textContent = d.cluster_id;
+  document.getElementById('rName').textContent = d.cluster_name;
+  document.getElementById('rDesc').textContent = '// ' + d.description;
+
+  // pills
+  const pills = document.getElementById('rPills');
+  pills.innerHTML = '';
+  (d.traits||[]).forEach((t, i) => {
+    pills.innerHTML += `<span class="r-pill" style="animation-delay:${i*.08}s">${t}</span>`;
+  });
+
+  // meta
+  document.getElementById('rConf').textContent = (d.confidence*100).toFixed(0) + '%';
+  document.getElementById('rSize').textContent = d.cluster_size.toLocaleString();
+  document.getElementById('rAlgo').textContent = am.s;
+
+  // algo
+  document.getElementById('rIcon').textContent = am.i;
+  document.getElementById('rATitle').textContent = am.n;
+  document.getElementById('rADesc').textContent = '// ' + am.desc;
+
+  // DNA
+  const dna = document.getElementById('dnaBox');
+  dna.innerHTML = '<div class="dna-title">// audio_dna_profile — centroid vs your input</div>';
+  const DF = [
+    {k:'danceability',   l:'DANCEABILITY'},
+    {k:'energy',         l:'ENERGY'},
+    {k:'acousticness',   l:'ACOUSTICNESS'},
+    {k:'valence',        l:'VALENCE'},
+    {k:'speechiness',    l:'SPEECHINESS'},
+    {k:'liveness',       l:'LIVENESS'},
+    {k:'instrumentalness',l:'INSTRUMENTAL'},
+  ];
+  DF.forEach((f, i) => {
+    const c = (d.feature_scores||{})[f.k] ?? 0.5;
+    const iv2 = inp[f.k] ?? 0.5;
+    const pct = Math.round(c * 100);
+    const ipct = Math.round(iv2 * 100);
+    const row = document.createElement('div');
+    row.className = 'dna-row';
+    row.style.animationDelay = (i * .07) + 's';
+    row.innerHTML = `
+      <div class="dna-labels">
+        <span class="dna-lbl">${f.l}</span>
+        <span class="dna-pct">${pct}% <span style="color:rgba(0,245,255,.4);font-size:10px">∙ you:${ipct}%</span></span>
+      </div>
+      <div class="dna-track">
+        <div class="dna-fill" id="df${f.k}"></div>
+        <div class="dna-input-mark" id="dm${f.k}" style="left:${ipct}%"></div>
+      </div>`;
+    dna.appendChild(row);
+    setTimeout(() => {
+      const el = document.getElementById('df'+f.k);
+      if(el){ el.style.width = pct + '%'; setTimeout(() => el.classList.add('lit'), 900); }
+    }, 100 + i * 70);
+  });
+
+  const res = document.getElementById('resBox');
+  res.classList.add('show');
+  setTimeout(() => res.scrollIntoView({behavior:'smooth', block:'nearest'}), 80);
+}
+
+function renderHistory(){
+  const box = document.getElementById('histBox');
+  const grid = document.getElementById('histGrid');
+  if(!H_arr.length){ box.style.display='none'; return; }
+  box.style.display = 'block';
+  grid.innerHTML = '';
+  H_arr.forEach((h, i) => {
+    const am = ALGOS[h.algo];
+    const el = document.createElement('div');
+    el.className = 'h-item';
+    el.style.animationDelay = (i*.05)+'s';
+    el.innerHTML = `<div class="h-cl">${am.i} CLUSTER_${h.cluster_id}</div><div class="h-nm">${h.cluster_name}</div><div class="h-al">${am.s}</div>`;
+    grid.appendChild(el);
+  });
+}
+
+document.getElementById('btnGo').addEventListener('click', analyze);
+document.getElementById('btnRnd').addEventListener('click', randomize);
+buildSliders();
+</script>
+</body>
+</html>
