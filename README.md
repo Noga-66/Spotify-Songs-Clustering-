@@ -53,7 +53,7 @@ jupyter notebook Spotify_Clustering.ipynb
 
 Just open `index.html` in any browser — no server needed.
 
-> To enable the AI clustering feature, you need an [Anthropic API key](https://console.anthropic.com/).
+> To enable the AI clustering feature, you need an [live demo](https://noga-66.github.io/Spotify-Songs-Clustering-/).
 
 ---
 
