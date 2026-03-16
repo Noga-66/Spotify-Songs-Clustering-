@@ -61,7 +61,7 @@ Just open `index.html` in any browser — no server needed.
 
 | Property | Value |
 |---|---|
-| Source | [Spotify Features — Kaggle]() |
+| Source | [Spotify Features — Kaggle](https://drive.google.com/file/d/1gz74jdqc42xVzE7oh2TU6Tn3chFANFlB/view?usp=drive_link) |
 | Records | 232,725 songs |
 | Genres | 26 (Pop, Rock, Jazz, Hip-Hop, Classical…) |
 | Features | 18 columns |
@@ -217,14 +217,6 @@ Example cluster profiles discovered from the dataset:
 
 ---
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-algorithm`
-3. Commit your changes: `git commit -m 'add: HDBSCAN support'`
-4. Push and open a Pull Request
-
----
 
 ## 📄 License
 
@@ -234,8 +226,8 @@ MIT License — free to use, modify, and distribute.
 
 ## 👤 Author
 
-Built with ❤️ using Python, scikit-learn, and Claude AI.
+Built  BY Nada Hossam ❤️ using Python, scikit-learn, and Claude AI.
 
 ---
 
-*Sound DNA · Spotify Clustering Engine · Powered by Claude AI*
+*Sound DNA · Spotify Clustering Engine .
