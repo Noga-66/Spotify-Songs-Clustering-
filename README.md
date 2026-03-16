@@ -61,7 +61,7 @@ Just open `index.html` in any browser — no server needed.
 
 | Property | Value |
 |---|---|
-| Source | [Spotify Features — Kaggle](https://www.kaggle.com/datasets/zaheenhamidani/ultimate-spotify-tracks-db) |
+| Source | [Spotify Features — Kaggle]() |
 | Records | 232,725 songs |
 | Genres | 26 (Pop, Rock, Jazz, Hip-Hop, Classical…) |
 | Features | 18 columns |
@@ -153,30 +153,6 @@ The `index.html` app provides a live clustering experience:
 
 ---
 
-## ☁️ Deployment
-
-### Option 1 — Netlify Drop (Fastest)
-1. Go to [netlify.com/drop](https://app.netlify.com/drop)
-2. Drag and drop `index.html`
-3. Live in 30 seconds ✅
-
-### Option 2 — GitHub Pages
-```bash
-git init
-git add index.html
-git commit -m "deploy: spotify clustering app"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
-# Then: Settings → Pages → Deploy from main branch
-```
-
-### Option 3 — Vercel
-```bash
-npx vercel --prod
-```
-
----
 
 ## ⚙️ Configuration
 
